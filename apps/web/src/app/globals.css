@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.08 0.01 240);
+  --foreground: oklch(0.95 0.005 240);
+  --card: oklch(0.12 0.01 240);
+  --card-foreground: oklch(0.95 0.005 240);
+  --popover: oklch(0.12 0.01 240);
+  --popover-foreground: oklch(0.95 0.005 240);
+  --primary: oklch(0.43 0.08 195);       /* petroleum blue-green  #1a5f6a */
+  --primary-foreground: oklch(0.98 0 0); /* white on blue */
+  --secondary: oklch(0.18 0.01 240);
+  --secondary-foreground: oklch(0.95 0.005 240);
+  --muted: oklch(0.18 0.01 240);
+  --muted-foreground: oklch(0.55 0.01 240);
+  --accent: oklch(0.18 0.01 240);
+  --accent-foreground: oklch(0.95 0.005 240);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.95 0.005 240);
+  --border: oklch(0.22 0.01 240);
+  --input: oklch(0.18 0.01 240);
+  --ring: oklch(0.43 0.08 195);          /* petroleum blue-green */
+  --radius: 0.5rem;
+  --sidebar-width: 240px;
+  --profit: oklch(0.65 0.18 160);        /* green — semantic financial colour */
+  --loss: oklch(0.6 0.2 25);             /* red */
+  --warning: oklch(0.72 0.19 44);        /* orange #f97316 — secondary brand */
+  --secondary-brand: oklch(0.72 0.19 44);/* orange alias */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.profit { color: var(--profit); }
+.loss { color: var(--loss); }
+.warning { color: var(--warning); }
+
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+}
+
+.progress-bar {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--secondary);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+
+.progress-fill.danger {
+  background: var(--loss);
+}
+
+.progress-fill.warning {
+  background: var(--warning);
+}
+
+/* ─── Clerk dark theme overrides ──────────────────────────────────────────── */
+/* Clerk injects its own CSS — we override by targeting its BEM class names    */
+
+/* Card */
+.cl-card,
+.cl-signIn-root .cl-card,
+.cl-signUp-root .cl-card {
+  background: #111827 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Header */
+.cl-headerTitle {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.cl-headerSubtitle {
+  color: #9ca3af !important;
+}
+
+/* Labels */
+.cl-formFieldLabel,
+.cl-label {
+  color: #d1d5db !important;
+  font-weight: 500 !important;
+}
+
+/* Inputs */
+.cl-formFieldInput,
+.cl-input {
+  background: #1f2937 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f9fafb !important;
+  caret-color: #1a5f6a !important;
+}
+
+.cl-formFieldInput::placeholder,
+.cl-input::placeholder {
+  color: #6b7280 !important;
+}
+
+.cl-formFieldInput:focus,
+.cl-input:focus {
+  border-color: #1a5f6a !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+  outline: none !important;
+}
+
+/* Social buttons */
+.cl-socialButtonsBlockButton {
+  background: #1f2937 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background: #374151 !important;
+}
+
+.cl-socialButtonsBlockButtonText {
+  color: #ffffff !important;
+}
+
+/* Divider */
+.cl-dividerLine {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.cl-dividerText {
+  color: #6b7280 !important;
+  background: #111827 !important;
+}
+
+/* Footer */
+.cl-footer,
+.cl-footerAction {
+  background: #0d1117 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.cl-footerActionText {
+  color: #9ca3af !important;
+}
+
+.cl-footerActionLink {
+  color: #1a5f6a !important;
+  font-weight: 600 !important;
+}
+
+.cl-footerActionLink:hover {
+  color: #38bdf8 !important;
+}
+
+/* Identity preview (after email entered) */
+.cl-identityPreviewText {
+  color: #f9fafb !important;
+}
+
+.cl-identityPreviewEditButton {
+  color: #1a5f6a !important;
+}
+
+/* Error messages */
+.cl-formFieldErrorText,
+.cl-alertText {
+  color: #f87171 !important;
+}
+
+/* "Secured by Clerk" */
+.cl-internal-b3fm6y,
+.cl-poweredByClerk,
+[class*="poweredBy"] {
+  opacity: 0.4 !important;
+  filter: invert(1) !important;
+}
+
+/* Main button */
+.cl-formButtonPrimary {
+  background: #1a5f6a !important;
+  color: #000000 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.25) !important;
+}
+
+.cl-formButtonPrimary:hover {
+  background: #134f56 !important;
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4) !important;
+}
+
+/* Inner card body background */
+.cl-main,
+.cl-cardBox {
+  background: #111827 !important;
+}

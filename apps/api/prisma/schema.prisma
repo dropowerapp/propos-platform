@@ -1,0 +1,892 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── TENANCY & USERS ─────────────────────────────────────────────────────────
+
+model Tenant {
+  id                   String    @id @default(uuid())
+  clerkOrgId           String?   @unique @map("clerk_org_id")
+  name                 String
+  slug                 String    @unique
+  plan                 String    @default("starter")
+  planExpiresAt        DateTime? @map("plan_expires_at")
+  stripeCustomerId     String?   @map("stripe_customer_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  settings             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  users              User[]
+  tradingAccounts    TradingAccount[]
+  brokerConnections  BrokerConnection[]
+  trades             Trade[]
+  journalEntries     JournalEntry[]
+  tags               Tag[]
+  strategies         Strategy[]
+  propFirmAccounts   PropFirmAccount[]
+  payouts            Payout[]
+  alertRules         AlertRule[]
+  alertEvents        AlertEvent[]
+  importJobs         ImportJob[]
+  aiConversations    AiConversation[]
+  backtests          Backtest[]
+  firmRecommendations FirmRecommendation[]
+  playbookSetups     PlaybookSetup[]
+
+  @@map("tenants")
+}
+
+model User {
+  id                   String   @id @default(uuid())
+  clerkUserId          String   @unique @map("clerk_user_id")
+  tenantId             String   @map("tenant_id")
+  email                String
+  fullName             String?  @map("full_name")
+  avatarUrl            String?  @map("avatar_url")
+  role                 String   @default("member")
+  timezone             String   @default("UTC")
+  currency             String   @default("USD")
+  onboardingCompleted  Boolean  @default(false) @map("onboarding_completed")
+  preferences          Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tradingAccounts    TradingAccount[]
+  brokerConnections  BrokerConnection[]
+  trades             Trade[]
+  journalEntries     JournalEntry[]
+  tags               Tag[]
+  strategies         Strategy[]
+  propFirmAccounts   PropFirmAccount[]
+  payouts            Payout[]
+  alertRules         AlertRule[]
+  alertEvents        AlertEvent[]
+  importJobs         ImportJob[]
+  aiConversations    AiConversation[]
+  backtests          Backtest[]
+  propFirmReviews     PropFirmReview[]
+  firmRecommendations FirmRecommendation[]
+  playbookSetups      PlaybookSetup[]
+
+  @@map("users")
+}
+
+// ─── TRADING ACCOUNTS ────────────────────────────────────────────────────────
+
+model BrokerConnection {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  userId         String    @map("user_id")
+  brokerType     String    @map("broker_type")
+  connectionName String    @map("connection_name")
+  credentials    Json?
+  accountNumber  String?   @map("account_number")
+  server         String?
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  syncStatus     String    @default("idle") @map("sync_status")
+  syncError      String?   @map("sync_error")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingAccounts TradingAccount[]
+
+  @@map("broker_connections")
+}
+
+model TradingAccount {
+  id                  String   @id @default(uuid())
+  tenantId            String   @map("tenant_id")
+  userId              String   @map("user_id")
+  brokerConnectionId  String?  @map("broker_connection_id")
+  propFirmAccountId   String?  @map("prop_firm_account_id")
+  name                String
+  accountNumber       String?  @map("account_number")
+  brokerType          String?  @map("broker_type")
+  currency            String   @default("USD")
+  initialBalance      Decimal  @default(0) @map("initial_balance") @db.Decimal(20, 6)
+  currentBalance      Decimal? @map("current_balance") @db.Decimal(20, 6)
+  accountType         String?  @map("account_type")
+  isActive            Boolean  @default(true) @map("is_active")
+  color               String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerConnection  BrokerConnection? @relation(fields: [brokerConnectionId], references: [id], onDelete: SetNull)
+  propFirmAccount   PropFirmAccount?  @relation(fields: [propFirmAccountId], references: [id], onDelete: SetNull)
+  trades            Trade[]
+  importJobs        ImportJob[]
+  analyticsRollups  AnalyticsDailyRollup[]
+
+  @@map("trading_accounts")
+}
+
+// ─── TRADES ──────────────────────────────────────────────────────────────────
+
+model Trade {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  userId            String    @map("user_id")
+  tradingAccountId  String    @map("trading_account_id")
+
+  brokerTradeId     String?   @map("broker_trade_id")
+  brokerTicket      String?   @map("broker_ticket")
+  importHash        String?   @unique @map("import_hash")
+
+  symbol            String
+  direction         String
+  status            String    @default("closed")
+
+  openTime          DateTime  @map("open_time")
+  closeTime         DateTime? @map("close_time")
+  openPrice         Decimal   @map("open_price") @db.Decimal(20, 8)
+  closePrice        Decimal?  @map("close_price") @db.Decimal(20, 8)
+  stopLoss          Decimal?  @map("stop_loss") @db.Decimal(20, 8)
+  takeProfit        Decimal?  @map("take_profit") @db.Decimal(20, 8)
+  lots              Decimal   @db.Decimal(20, 6)
+
+  grossPnl          Decimal?  @map("gross_pnl") @db.Decimal(20, 6)
+  commission        Decimal   @default(0) @db.Decimal(20, 6)
+  swap              Decimal   @default(0) @db.Decimal(20, 6)
+  netPnl            Decimal?  @map("net_pnl") @db.Decimal(20, 6)
+  pips              Decimal?  @db.Decimal(20, 4)
+
+  riskPercent       Decimal?  @map("risk_percent") @db.Decimal(10, 4)
+  riskReward        Decimal?  @map("risk_reward") @db.Decimal(10, 4)
+  rMultiple         Decimal?  @map("r_multiple") @db.Decimal(10, 4)
+
+  durationSeconds   Int?      @map("duration_seconds")
+  session           String?
+  dayOfWeek         Int?      @map("day_of_week")
+  month             Int?
+  year              Int?
+  outcome           String?
+  isManual          Boolean   @default(false) @map("is_manual")
+  rawData           Json?     @map("raw_data")
+
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingAccount  TradingAccount  @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+  journalEntry    JournalEntry?
+  executions      TradeExecution[]
+  tradeTags       TradeTag[]
+  tradeStrategies TradeStrategy[]
+  playbookTags    TradePlaybookTag[]
+
+  @@index([tenantId, userId])
+  @@index([tradingAccountId])
+  @@index([openTime(sort: Desc)])
+  @@index([symbol])
+  @@map("trades")
+}
+
+model TradeExecution {
+  id            String   @id @default(uuid())
+  tradeId       String   @map("trade_id")
+  executionType String   @map("execution_type")
+  price         Decimal  @db.Decimal(20, 8)
+  lots          Decimal  @db.Decimal(20, 6)
+  executedAt    DateTime @map("executed_at")
+  pnl           Decimal? @db.Decimal(20, 6)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  trade Trade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@map("trade_executions")
+}
+
+// ─── JOURNAL ─────────────────────────────────────────────────────────────────
+
+model JournalEntry {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  userId           String   @map("user_id")
+  tradeId          String?  @unique @map("trade_id")
+  tradingAccountId String?  @map("trading_account_id")
+  strategyId       String?  @map("strategy_id")
+
+  entryDate        DateTime @map("entry_date") @db.Date
+  entryType        String   @default("trade") @map("entry_type")
+
+  notes            String?
+  tradingPlan      String?  @map("trading_plan")
+  mistakes         String?
+  lessons          String?
+  marketAnalysis   String?  @map("market_analysis")
+
+  emotionalState   String?  @map("emotional_state")
+  confidenceLevel  Int?     @map("confidence_level")
+  stressLevel      Int?     @map("stress_level")
+  disciplineScore  Int?     @map("discipline_score")
+  energyLevel      Int?     @map("energy_level")
+  focusScore       Int?     @map("focus_score")
+
+  setupType        String?  @map("setup_type")
+  marketCondition  String?  @map("market_condition")
+  followedPlan     Boolean? @map("followed_plan")
+
+  aiSentiment      String?  @map("ai_sentiment")
+  aiSummary        String?  @map("ai_summary")
+
+  wordCount        Int      @default(0) @map("word_count")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trade       Trade?              @relation(fields: [tradeId], references: [id], onDelete: SetNull)
+  strategy    Strategy?           @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  screenshots JournalScreenshot[]
+  journalTags JournalTag[]
+
+  @@index([tenantId, userId])
+  @@index([entryDate(sort: Desc)])
+  @@map("journal_entries")
+}
+
+model JournalScreenshot {
+  id             String   @id @default(uuid())
+  journalEntryId String?  @map("journal_entry_id")
+  s3Key          String   @map("s3_key")
+  s3Url          String   @map("s3_url")
+  thumbnailUrl   String?  @map("thumbnail_url")
+  filename       String?
+  fileSize       Int?     @map("file_size")
+  mimeType       String?  @map("mime_type")
+  caption        String?
+  timeframe      String?
+  chartType      String?  @map("chart_type")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+
+  @@map("journal_screenshots")
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  name      String
+  color     String?
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradeTags   TradeTag[]
+  journalTags JournalTag[]
+
+  @@unique([tenantId, userId, name])
+  @@map("tags")
+}
+
+model TradeTag {
+  tradeId String @map("trade_id")
+  tagId   String @map("tag_id")
+
+  trade Trade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([tradeId, tagId])
+  @@map("trade_tags")
+}
+
+model JournalTag {
+  journalEntryId String @map("journal_entry_id")
+  tagId          String @map("tag_id")
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  tag          Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([journalEntryId, tagId])
+  @@map("journal_tags")
+}
+
+model Strategy {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  timeframes  String[]
+  instruments String[]
+  rules       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  color       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journalEntries  JournalEntry[]
+  tradeStrategies TradeStrategy[]
+  backtests       Backtest[]
+
+  @@map("strategies")
+}
+
+model TradeStrategy {
+  tradeId    String @map("trade_id")
+  strategyId String @map("strategy_id")
+
+  trade    Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@id([tradeId, strategyId])
+  @@map("trade_strategies")
+}
+
+// ─── PROP FIRM DIRECTORY ─────────────────────────────────────────────────────
+
+model PropFirm {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  logoUrl         String?   @map("logo_url")
+  websiteUrl      String?   @map("website_url")
+  country         String?
+  foundedYear     Int?      @map("founded_year")
+  description     String?
+  isActive        Boolean   @default(true) @map("is_active")
+  isVerified      Boolean   @default(false) @map("is_verified")
+  instruments     String[]
+  platforms       String[]
+  payoutMethods   String[]  @map("payout_methods")
+  headquarters    String?
+  lastCrawledAt   DateTime? @map("last_crawled_at")
+  crawlUrl        String?   @map("crawl_url")
+  crawlSelectors  Json?     @map("crawl_selectors")
+  trustScore      Decimal?  @map("trust_score") @db.Decimal(5, 2)
+  communityRating Decimal?  @map("community_rating") @db.Decimal(3, 2)
+  reviewCount     Int       @default(0) @map("review_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  challengeTypes      PropFirmChallengeType[]
+  rules               PropFirmRule[]
+  ruleSnapshots       PropFirmRuleSnapshot[]
+  ruleChanges         PropFirmRuleChange[]
+  reviews             PropFirmReview[]
+  propFirmAccounts    PropFirmAccount[]
+  payouts             Payout[]
+  recommendations     FirmRecommendation[]
+
+  @@map("prop_firms")
+}
+
+model PropFirmChallengeType {
+  id          String   @id @default(uuid())
+  propFirmId  String   @map("prop_firm_id")
+  name        String
+  slug        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  propFirm     PropFirm              @relation(fields: [propFirmId], references: [id], onDelete: Cascade)
+  accountSizes PropFirmAccountSize[]
+  rules        PropFirmRule[]
+  accounts     PropFirmAccount[]
+
+  @@map("prop_firm_challenge_types")
+}
+
+model PropFirmAccountSize {
+  id              String   @id @default(uuid())
+  challengeTypeId String   @map("challenge_type_id")
+  accountSize     Int      @map("account_size")
+  price           Decimal? @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  challengeType PropFirmChallengeType @relation(fields: [challengeTypeId], references: [id], onDelete: Cascade)
+
+  @@map("prop_firm_account_sizes")
+}
+
+model PropFirmRule {
+  id              String    @id @default(uuid())
+  propFirmId      String    @map("prop_firm_id")
+  challengeTypeId String?   @map("challenge_type_id")
+  phase           Int       @default(1)
+
+  profitTargetPct         Decimal? @map("profit_target_pct") @db.Decimal(5, 2)
+  dailyDrawdownPct        Decimal? @map("daily_drawdown_pct") @db.Decimal(5, 2)
+  dailyDrawdownType       String?  @map("daily_drawdown_type")
+  maxDrawdownPct          Decimal? @map("max_drawdown_pct") @db.Decimal(5, 2)
+  maxDrawdownType         String?  @map("max_drawdown_type")
+  trailingDrawdown        Boolean  @default(false) @map("trailing_drawdown")
+  minTradingDays          Int?     @map("min_trading_days")
+  maxTradingDays          Int?     @map("max_trading_days")
+  maxChallengeDurationDays Int?    @map("max_challenge_duration_days")
+  maxLotSize              Decimal? @map("max_lot_size") @db.Decimal(10, 2)
+  newsTradingAllowed      Boolean  @default(true) @map("news_trading_allowed")
+  overnightHoldingAllowed Boolean  @default(true) @map("overnight_holding_allowed")
+  weekendHoldingAllowed   Boolean  @default(true) @map("weekend_holding_allowed")
+  eaAllowed               Boolean  @default(true) @map("ea_allowed")
+  copyTradingAllowed      Boolean  @default(false) @map("copy_trading_allowed")
+  consistencyRule         Boolean  @default(false) @map("consistency_rule")
+  consistencyPct          Decimal? @map("consistency_pct") @db.Decimal(5, 2)
+  minTradeDurationSeconds Int?     @map("min_trade_duration_seconds")
+  profitSplitPct          Decimal? @map("profit_split_pct") @db.Decimal(5, 2)
+  payoutFrequency         String?  @map("payout_frequency")
+  minPayoutAmount         Decimal? @map("min_payout_amount") @db.Decimal(10, 2)
+  scalingPlan             Json?    @map("scaling_plan")
+
+  effectiveFrom    DateTime  @default(now()) @map("effective_from")
+  effectiveTo      DateTime? @map("effective_to")
+  isCurrent        Boolean   @default(true) @map("is_current")
+  changeDescription String?  @map("change_description")
+  changedByCrawler Boolean   @default(false) @map("changed_by_crawler")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  propFirm      PropFirm               @relation(fields: [propFirmId], references: [id], onDelete: Cascade)
+  challengeType PropFirmChallengeType? @relation(fields: [challengeTypeId], references: [id])
+  accounts      PropFirmAccount[]
+
+  @@index([propFirmId, isCurrent])
+  @@map("prop_firm_rules")
+}
+
+model PropFirmRuleSnapshot {
+  id           String   @id @default(uuid())
+  propFirmId   String   @map("prop_firm_id")
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+  rulesJson    Json     @map("rules_json")
+  pricesJson   Json?    @map("prices_json")
+  crawledAt    DateTime @default(now()) @map("crawled_at")
+
+  propFirm PropFirm @relation(fields: [propFirmId], references: [id], onDelete: Cascade)
+
+  @@unique([propFirmId, snapshotDate])
+  @@map("prop_firm_rule_snapshots")
+}
+
+// ─── USER PROP FIRM ACCOUNTS ─────────────────────────────────────────────────
+
+model PropFirmAccount {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  userId          String    @map("user_id")
+  propFirmId      String    @map("prop_firm_id")
+  challengeTypeId String?   @map("challenge_type_id")
+  rulesSnapshotId String?   @map("rules_snapshot_id")
+
+  accountName    String?   @map("account_name")
+  accountNumber  String?   @map("account_number")
+  accountSize    Int       @map("account_size")
+  currentPhase   Int       @default(1) @map("current_phase")
+  status         String    @default("active")
+
+  purchasedAt    DateTime? @map("purchased_at") @db.Date
+  activatedAt    DateTime? @map("activated_at") @db.Date
+  phaseStartedAt DateTime? @map("phase_started_at") @db.Date
+  passedAt       DateTime? @map("passed_at") @db.Date
+  failedAt       DateTime? @map("failed_at") @db.Date
+  fundedAt       DateTime? @map("funded_at") @db.Date
+
+  challengeCost  Decimal?  @map("challenge_cost") @db.Decimal(10, 2)
+  activationFee  Decimal   @default(0) @map("activation_fee") @db.Decimal(10, 2)
+  resetCount     Int       @default(0) @map("reset_count")
+  totalResetFees Decimal   @default(0) @map("total_reset_fees") @db.Decimal(10, 2)
+  addonCosts     Decimal   @default(0) @map("addon_costs") @db.Decimal(10, 2)
+
+  currentBalance     Decimal? @map("current_balance") @db.Decimal(20, 6)
+  peakBalance        Decimal? @map("peak_balance") @db.Decimal(20, 6)
+  currentDrawdownPct Decimal? @map("current_drawdown_pct") @db.Decimal(10, 4)
+  dailyPnl           Decimal? @map("daily_pnl") @db.Decimal(20, 6)
+  totalPnl           Decimal? @map("total_pnl") @db.Decimal(20, 6)
+  tradingDaysCount   Int      @default(0) @map("trading_days_count")
+  isAtRisk           Boolean  @default(false) @map("is_at_risk")
+  notes              String?
+  color              String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propFirm        PropFirm                 @relation(fields: [propFirmId], references: [id])
+  challengeType   PropFirmChallengeType?   @relation(fields: [challengeTypeId], references: [id])
+  rulesSnapshot   PropFirmRule?            @relation(fields: [rulesSnapshotId], references: [id])
+  tradingAccounts TradingAccount[]
+  payouts         Payout[]
+  dailySnapshots  ChallengeDailySnapshot[]
+  alertRules      AlertRule[]
+  alertEvents     AlertEvent[]
+
+  @@index([tenantId, userId])
+  @@index([status])
+  @@map("prop_firm_accounts")
+}
+
+model ChallengeDailySnapshot {
+  id                String   @id @default(uuid())
+  propFirmAccountId String   @map("prop_firm_account_id")
+  snapshotDate      DateTime @map("snapshot_date") @db.Date
+  balance           Decimal? @db.Decimal(20, 6)
+  equity            Decimal? @db.Decimal(20, 6)
+  dailyPnl          Decimal? @map("daily_pnl") @db.Decimal(20, 6)
+  dailyDrawdownPct  Decimal? @map("daily_drawdown_pct") @db.Decimal(10, 4)
+  maxDrawdownPct    Decimal? @map("max_drawdown_pct") @db.Decimal(10, 4)
+  tradingDays       Int?     @map("trading_days")
+  status            String?
+
+  propFirmAccount PropFirmAccount @relation(fields: [propFirmAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([propFirmAccountId, snapshotDate])
+  @@map("challenge_daily_snapshots")
+}
+
+// ─── PAYOUTS ─────────────────────────────────────────────────────────────────
+
+model Payout {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  userId            String   @map("user_id")
+  propFirmAccountId String   @map("prop_firm_account_id")
+  propFirmId        String   @map("prop_firm_id")
+  amount            Decimal  @db.Decimal(10, 2)
+  currency          String   @default("USD")
+  payoutDate        DateTime @map("payout_date") @db.Date
+  profitSplitPct    Decimal? @map("profit_split_pct") @db.Decimal(5, 2)
+  grossProfit       Decimal? @map("gross_profit") @db.Decimal(10, 2)
+  status            String   @default("pending")
+  paymentMethod     String?  @map("payment_method")
+  transactionRef    String?  @map("transaction_ref")
+  notes             String?
+  proofUrl          String?  @map("proof_url")
+  processingDays    Int?     @map("processing_days")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propFirmAccount PropFirmAccount @relation(fields: [propFirmAccountId], references: [id], onDelete: Cascade)
+  propFirm        PropFirm        @relation(fields: [propFirmId], references: [id])
+
+  @@map("payouts")
+}
+
+// ─── ANALYTICS ───────────────────────────────────────────────────────────────
+
+model AnalyticsDailyRollup {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  userId           String   @map("user_id")
+  tradingAccountId String   @map("trading_account_id")
+  date             DateTime @db.Date
+  totalTrades      Int      @default(0) @map("total_trades")
+  winningTrades    Int      @default(0) @map("winning_trades")
+  losingTrades     Int      @default(0) @map("losing_trades")
+  winRate          Decimal? @map("win_rate") @db.Decimal(5, 4)
+  grossPnl         Decimal? @map("gross_pnl") @db.Decimal(20, 6)
+  netPnl           Decimal? @map("net_pnl") @db.Decimal(20, 6)
+  commission       Decimal? @db.Decimal(20, 6)
+  largestWin       Decimal? @map("largest_win") @db.Decimal(20, 6)
+  largestLoss      Decimal? @map("largest_loss") @db.Decimal(20, 6)
+  avgWin           Decimal? @map("avg_win") @db.Decimal(20, 6)
+  avgLoss          Decimal? @map("avg_loss") @db.Decimal(20, 6)
+  profitFactor     Decimal? @map("profit_factor") @db.Decimal(10, 4)
+  expectancy       Decimal? @db.Decimal(10, 4)
+  avgRMultiple     Decimal? @map("avg_r_multiple") @db.Decimal(10, 4)
+  maxDrawdown      Decimal? @map("max_drawdown") @db.Decimal(10, 4)
+
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([tradingAccountId, date])
+  @@map("analytics_daily_rollups")
+}
+
+// ─── ALERTS ──────────────────────────────────────────────────────────────────
+
+model AlertRule {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  userId            String   @map("user_id")
+  propFirmAccountId String?  @map("prop_firm_account_id")
+  alertType         String   @map("alert_type")
+  thresholdValue    Decimal? @map("threshold_value") @db.Decimal(10, 4)
+  thresholdType     String?  @map("threshold_type")
+  isActive          Boolean  @default(true) @map("is_active")
+  channels          String[]
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propFirmAccount PropFirmAccount? @relation(fields: [propFirmAccountId], references: [id], onDelete: Cascade)
+  alertEvents     AlertEvent[]
+
+  @@map("alert_rules")
+}
+
+model AlertEvent {
+  id                String    @id @default(uuid())
+  alertRuleId       String?   @map("alert_rule_id")
+  tenantId          String    @map("tenant_id")
+  userId            String    @map("user_id")
+  propFirmAccountId String?   @map("prop_firm_account_id")
+  alertType         String    @map("alert_type")
+  severity          String    @default("info")
+  title             String
+  body              String?
+  data              Json?
+  isRead            Boolean   @default(false) @map("is_read")
+  isDismissed       Boolean   @default(false) @map("is_dismissed")
+  sentAt            DateTime  @default(now()) @map("sent_at")
+  readAt            DateTime? @map("read_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  propFirmAccount PropFirmAccount? @relation(fields: [propFirmAccountId], references: [id], onDelete: SetNull)
+  alertRule       AlertRule?       @relation(fields: [alertRuleId], references: [id], onDelete: SetNull)
+
+  @@map("alert_events")
+}
+
+// ─── COMMUNITY ───────────────────────────────────────────────────────────────
+
+model PropFirmReview {
+  id                String   @id @default(uuid())
+  propFirmId        String   @map("prop_firm_id")
+  userId            String   @map("user_id")
+  payoutSpeed       Int?     @map("payout_speed")
+  customerSupport   Int?     @map("customer_support")
+  executionQuality  Int?     @map("execution_quality")
+  slippage          Int?
+  transparency      Int?
+  dashboardUx       Int?     @map("dashboard_ux")
+  overallRating     Int      @map("overall_rating")
+  accountSizeTraded Int?     @map("account_size_traded")
+  verifiedTrader    Boolean  @default(false) @map("verified_trader")
+  reviewTitle       String?  @map("review_title")
+  reviewBody        String?  @map("review_body")
+  pros              String?
+  cons              String?
+  isApproved        Boolean  @default(false) @map("is_approved")
+  upvotes           Int      @default(0)
+  downvotes         Int      @default(0)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  propFirm PropFirm @relation(fields: [propFirmId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([propFirmId, userId])
+  @@map("prop_firm_reviews")
+}
+
+// ─── BACKTESTING ─────────────────────────────────────────────────────────────
+
+model Backtest {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  userId         String    @map("user_id")
+  strategyId     String?   @map("strategy_id")
+  name           String
+  description    String?
+  engine         String
+  symbol         String
+  timeframe      String
+  startDate      DateTime  @map("start_date") @db.Date
+  endDate        DateTime  @map("end_date") @db.Date
+  initialCapital Decimal   @map("initial_capital") @db.Decimal(20, 6)
+  params         Json?
+  status         String    @default("pending")
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  errorMessage   String?   @map("error_message")
+
+  totalTrades    Int?     @map("total_trades")
+  winRate        Decimal? @map("win_rate") @db.Decimal(5, 4)
+  profitFactor   Decimal? @map("profit_factor") @db.Decimal(10, 4)
+  expectancy     Decimal? @db.Decimal(10, 4)
+  sharpeRatio    Decimal? @map("sharpe_ratio") @db.Decimal(10, 4)
+  sortinoRatio   Decimal? @map("sortino_ratio") @db.Decimal(10, 4)
+  calmarRatio    Decimal? @map("calmar_ratio") @db.Decimal(10, 4)
+  maxDrawdownPct Decimal? @map("max_drawdown_pct") @db.Decimal(10, 4)
+  totalReturnPct Decimal? @map("total_return_pct") @db.Decimal(10, 4)
+  probOfRuin     Decimal? @map("prob_of_ruin") @db.Decimal(5, 4)
+
+  resultsJson Json? @map("results_json")
+  equityCurve Json? @map("equity_curve")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+
+  @@map("backtests")
+}
+
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+model AiConversation {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  userId       String   @map("user_id")
+  title        String?
+  contextType  String?  @map("context_type")
+  contextId    String?  @map("context_id")
+  messageCount Int      @default(0) @map("message_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  role           String
+  content        String
+  tokensUsed     Int?     @map("tokens_used")
+  model          String?
+  latencyMs      Int?     @map("latency_ms")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_messages")
+}
+
+// ─── IMPORTS ─────────────────────────────────────────────────────────────────
+
+model ImportJob {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  userId           String    @map("user_id")
+  tradingAccountId String    @map("trading_account_id")
+  source           String
+  filename         String?
+  fileSize         Int?      @map("file_size")
+  s3Key            String?   @map("s3_key")
+  status           String    @default("queued")
+  progressPct      Int       @default(0) @map("progress_pct")
+  totalRows        Int?      @map("total_rows")
+  importedRows     Int       @default(0) @map("imported_rows")
+  skippedRows      Int       @default(0) @map("skipped_rows")
+  errorRows        Int       @default(0) @map("error_rows")
+  errors           Json?
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Cascade)
+
+  @@map("import_jobs")
+}
+
+// ─── RULE MONITOR ─────────────────────────────────────────────────────────────
+// Stores detected rule changes for the Rule Monitor page.
+// Populated by a crawler/admin job that compares PropFirmRuleSnapshot records.
+
+model PropFirmRuleChange {
+  id          String   @id @default(uuid())
+  propFirmId  String   @map("prop_firm_id")
+  changeType  String   @map("change_type")   // drawdown | payout | consistency | cost | platform | overnight | other
+  title       String
+  fieldName   String?  @map("field_name")    // which schema field changed
+  previousVal String?  @map("previous_val")  // human-readable previous value
+  currentVal  String?  @map("current_val")   // human-readable current value
+  impactLevel String   @default("medium") @map("impact_level") // high | medium | low
+  sourceUrl   String?  @map("source_url")
+  sourceLabel String?  @map("source_label")
+  detectedAt  DateTime @default(now()) @map("detected_at")
+  isVerified  Boolean  @default(false) @map("is_verified")   // manually confirmed by admin
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  propFirm PropFirm @relation(fields: [propFirmId], references: [id], onDelete: Cascade)
+
+  @@index([propFirmId, detectedAt])
+  @@index([changeType])
+  @@map("prop_firm_rule_changes")
+}
+
+// ─── FIRM RECOMMENDATIONS ─────────────────────────────────────────────────────
+// Cached recommendation results keyed per user.
+// Recalculated whenever the user's trade history changes significantly.
+
+model FirmRecommendation {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  tenantId        String   @map("tenant_id")
+  propFirmId      String   @map("prop_firm_id")
+  rank            Int
+  compatibilityPct Decimal @map("compatibility_pct") @db.Decimal(5, 2)
+  reasons         Json     // string[] — why recommended
+  cautions        Json     // string[] — what to watch out for
+  inputSnapshot   Json     @map("input_snapshot")  // the trader profile used for scoring
+  generatedAt     DateTime @default(now()) @map("generated_at")
+  expiresAt       DateTime @map("expires_at")       // stale after e.g. 7 days or trade count delta
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propFirm PropFirm @relation(fields: [propFirmId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propFirmId])
+  @@index([userId, rank])
+  @@map("firm_recommendations")
+}
+
+// ─── PLAYBOOK (future) ────────────────────────────────────────────────────────
+// Setup definitions that traders can tag their trades against.
+// Enables per-setup performance analytics.
+
+model PlaybookSetup {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  rules       String?  // free-text entry criteria
+  timeframes  String[] // e.g. ["H1", "H4"]
+  instruments String[] // e.g. ["EURUSD", "XAUUSD"]
+  direction   String?  // long | short | both
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades TradePlaybookTag[]
+
+  @@index([tenantId, userId])
+  @@map("playbook_setups")
+}
+
+model TradePlaybookTag {
+  tradeId   String @map("trade_id")
+  setupId   String @map("setup_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trade Trade         @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  setup PlaybookSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
+
+  @@id([tradeId, setupId])
+  @@map("trade_playbook_tags")
+}
