@@ -1,0 +1,33 @@
+# Render deploy config — PropOS API
+# Render detects this at the repo root. Free tier: the service sleeps after
+# 15 min idle and cold-starts (~30-50s) on the next request.
+services:
+  - type: web
+    name: propos-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: frankfurt
+    healthCheckPath: /v1/prop-firms
+    envVars:
+      # Render injects PORT automatically — the app reads it (do not hardcode)
+      - key: NODE_ENV
+        value: production
+      # Secrets below are set in the Render dashboard (sync:false = not in git)
+      - key: DATABASE_URL
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: BROKER_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CTRADER_CLIENT_ID
+        sync: false
+      - key: CTRADER_CLIENT_SECRET
+        sync: false
+      - key: CTRADER_REDIRECT_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
