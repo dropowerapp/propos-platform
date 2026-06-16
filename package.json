@@ -16,5 +16,19 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "bcrypt",
+      "esbuild",
+      "sharp",
+      "msgpackr-extract",
+      "unrs-resolver"
+    ]
   }
 }
