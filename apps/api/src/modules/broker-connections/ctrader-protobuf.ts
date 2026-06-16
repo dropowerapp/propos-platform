@@ -1,5 +1,6 @@
 import * as protobuf from 'protobufjs';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 
 // ─── cTrader Open API — protobuf over WebSocket ─────────────────────────────────
@@ -20,7 +21,14 @@ const PAYLOAD = {
 let rootPromise: Promise<protobuf.Root> | null = null;
 function loadRoot(): Promise<protobuf.Root> {
   if (!rootPromise) {
-    const dir = join(__dirname, 'proto');
+    // The .proto assets may sit next to the compiled code (dist/src/...) or at
+    // the build outDir (dist/modules/...). Try the likely locations.
+    const candidates = [
+      join(__dirname, 'proto'),
+      join(process.cwd(), 'apps/api/dist/modules/broker-connections/proto'),
+      join(process.cwd(), 'apps/api/src/modules/broker-connections/proto'),
+    ];
+    const dir = candidates.find(d => existsSync(join(d, 'OpenApiMessages.proto'))) ?? candidates[0];
     rootPromise = protobuf.load([
       join(dir, 'OpenApiCommonMessages.proto'),
       join(dir, 'OpenApiMessages.proto'),

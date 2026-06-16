@@ -24,4 +24,5 @@ RUN pnpm --filter api build
 
 ENV NODE_ENV=production
 EXPOSE 3001
-CMD ["node", "apps/api/dist/main"]
+# tsc nests under src/ (prisma.config.ts at the package root widens rootDir)
+CMD ["node", "apps/api/dist/src/main"]
